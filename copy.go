@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/schollz/progressbar/v3"
 )
 
 type timespec struct {
@@ -20,12 +22,24 @@ func Copy(src, dest string, opt ...Options) error {
 	if err != nil {
 		return err
 	}
-	return switchboard(src, dest, info, assureOptions(src, dest, opt...))
+	var p *progressbar.ProgressBar
+	var initialBasePath string
+	if len(opt) > 0 && opt[0].DirProgressBar && info.IsDir() {
+		p = progressbar.Default(1, "Dir: "+filepath.Base(src))
+		initialBasePath = filepath.Dir(src)
+	}
+	err = switchboard(src, dest, info, assureOptions(src, dest, opt...), p, initialBasePath)
+	if p != nil {
+		p.Describe("Dir: " + filepath.Base(src))
+		p.Add(1)
+		p.Finish()
+	}
+	return err
 }
 
 // switchboard switches proper copy functions regarding file type, etc...
 // If there would be anything else here, add a case to this switchboard.
-func switchboard(src, dest string, info os.FileInfo, opt Options) (err error) {
+func switchboard(src, dest string, info os.FileInfo, opt Options, p *progressbar.ProgressBar, initialBasePath string) (err error) {
 
 	if info.Mode()&os.ModeDevice != 0 && !opt.Specials {
 		return err
@@ -35,7 +49,7 @@ func switchboard(src, dest string, info os.FileInfo, opt Options) (err error) {
 	case info.Mode()&os.ModeSymlink != 0:
 		err = onsymlink(src, dest, opt)
 	case info.IsDir():
-		err = dcopy(src, dest, info, opt)
+		err = dcopy(src, dest, info, opt, p, initialBasePath)
 	case info.Mode()&os.ModeNamedPipe != 0:
 		err = pcopy(dest, info)
 	default:
@@ -48,7 +62,7 @@ func switchboard(src, dest string, info os.FileInfo, opt Options) (err error) {
 // copyNextOrSkip decide if this src should be copied or not.
 // Because this "copy" could be called recursively,
 // "info" MUST be given here, NOT nil.
-func copyNextOrSkip(src, dest string, info os.FileInfo, opt Options) error {
+func copyNextOrSkip(src, dest string, info os.FileInfo, opt Options, p *progressbar.ProgressBar, initialBasePath string) error {
 	if opt.Skip != nil {
 		skip, err := opt.Skip(info, src, dest)
 		if err != nil {
@@ -58,7 +72,7 @@ func copyNextOrSkip(src, dest string, info os.FileInfo, opt Options) error {
 			return nil
 		}
 	}
-	return switchboard(src, dest, info, opt)
+	return switchboard(src, dest, info, opt, p, initialBasePath)
 }
 
 // fcopy is for just a file,
@@ -94,6 +108,8 @@ func fcopy(src, dest string, info os.FileInfo, opt Options) (err error) {
 
 	if opt.WrapReader != nil {
 		r = opt.WrapReader(s)
+	} else if opt.FileProgressBar {
+		r = WrapReaderPB(s)
 	}
 
 	if opt.CopyBufferSize != 0 {
@@ -129,7 +145,7 @@ func fcopy(src, dest string, info os.FileInfo, opt Options) (err error) {
 // dcopy is for a directory,
 // with scanning contents inside the directory
 // and pass everything to "copy" recursively.
-func dcopy(srcdir, destdir string, info os.FileInfo, opt Options) (err error) {
+func dcopy(srcdir, destdir string, info os.FileInfo, opt Options, p *progressbar.ProgressBar, initialBasePath string) (err error) {
 
 	if skip, err := onDirExists(opt, srcdir, destdir); err != nil {
 		return err
@@ -149,12 +165,26 @@ func dcopy(srcdir, destdir string, info os.FileInfo, opt Options) (err error) {
 		return
 	}
 
+	if p != nil {
+		cc := p.GetMax64()
+		p.ChangeMax64(cc + int64(len(contents)))
+		if info.IsDir() {
+			newDesc, err := filepath.Rel(initialBasePath, srcdir)
+			if err == nil {
+				p.Describe("Dir: " + newDesc)
+			}
+		}
+	}
+
 	for _, content := range contents {
 		cs, cd := filepath.Join(srcdir, content.Name()), filepath.Join(destdir, content.Name())
 
-		if err = copyNextOrSkip(cs, cd, content, opt); err != nil {
+		if err = copyNextOrSkip(cs, cd, content, opt, p, initialBasePath); err != nil {
 			// If any error, exit immediately
 			return
+		}
+		if p != nil {
+			p.Add(1)
 		}
 	}
 
@@ -209,7 +239,7 @@ func onsymlink(src, dest string, opt Options) error {
 		if err != nil {
 			return err
 		}
-		return copyNextOrSkip(orig, dest, info, opt)
+		return copyNextOrSkip(orig, dest, info, opt, nil, "")
 	case Skip:
 		fallthrough
 	default:

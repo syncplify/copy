@@ -197,6 +197,14 @@ func TestOptions_Skip(t *testing.T) {
 	})
 }
 
+func TestOptions_PB(t *testing.T) {
+	opt := Options{
+		DirProgressBar: true,
+	}
+	err := Copy("test/data/case06", "test/data.copy/case06", opt)
+	Expect(t, err).ToBe(nil)
+}
+
 func TestOptions_Specials(t *testing.T) {
 	if runtime.GOOS == "linux" || runtime.GOOS == "darwin" {
 		err := Copy("/dev/null", "test/data.copy/dev-null", Options{Specials: false})
@@ -237,6 +245,14 @@ func TestOptions_Sync(t *testing.T) {
 	// With Sync option, each file will be flushed to storage on copying.
 	// TODO: Since it's a bit hard to simulate real usecases here. This testcase is nonsense.
 	opt := Options{Sync: true}
+	err := Copy("test/data/case08", "test/data.copy/case08", opt)
+	Expect(t, err).ToBe(nil)
+}
+
+func TestOptions_SyncAndProgress(t *testing.T) {
+	// With Sync option, each file will be flushed to storage on copying.
+	// TODO: Since it's a bit hard to simulate real usecases here. This testcase is nonsense.
+	opt := Options{Sync: true, FileProgressBar: true}
 	err := Copy("test/data/case08", "test/data.copy/case08", opt)
 	Expect(t, err).ToBe(nil)
 }

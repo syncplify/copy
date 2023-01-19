@@ -61,6 +61,10 @@ type Options struct {
 		src  string
 		dest string
 	}
+
+	// Callback functions for progress tracking
+	FileProgressBar bool
+	DirProgressBar  bool
 }
 
 // SymlinkAction represents what to do on symlink.
@@ -107,6 +111,8 @@ func getDefaultOptions(src, dest string) Options {
 			src  string
 			dest string
 		}{src, dest},
+		FileProgressBar: false,
+		DirProgressBar:  false,
 	}
 }
 
