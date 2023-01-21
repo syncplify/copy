@@ -109,7 +109,7 @@ func fcopy(src, dest string, info os.FileInfo, opt Options) (err error) {
 	if opt.WrapReader != nil {
 		r = opt.WrapReader(s)
 	} else if opt.FileProgressBar {
-		r = WrapReaderPB(s)
+		r = WrapReaderPB(s, dest)
 	}
 
 	if opt.CopyBufferSize != 0 {

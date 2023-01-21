@@ -14,14 +14,14 @@ type progressReader struct {
 	pbar *progressbar.ProgressBar
 }
 
-func WrapReaderPB(src *os.File) io.Reader {
+func WrapReaderPB(src *os.File, name string) io.Reader {
 	finfo, err := src.Stat()
 	if err != nil {
 		return src
 	}
 	return &progressReader{
 		src:  src,
-		pbar: progressbar.DefaultBytes(finfo.Size(), fmt.Sprintf("File: %s", filepath.Base(src.Name()))),
+		pbar: progressbar.DefaultBytes(finfo.Size(), fmt.Sprintf("File: %s", filepath.Base(name))),
 	}
 }
 
