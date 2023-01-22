@@ -170,6 +170,9 @@ func dcopy(srcdir, destdir string, info os.FileInfo, opt Options, p *progressbar
 		p.ChangeMax64(cc + int64(len(contents)))
 		if info.IsDir() {
 			newDesc, err := filepath.Rel(initialBasePath, srcdir)
+			if len(newDesc) > 42 {
+				newDesc = truncateString(newDesc, 42) + "..."
+			}
 			if err == nil {
 				p.Describe("Dir: " + newDesc)
 			}
